@@ -110,7 +110,6 @@ func (p *Postgres) Orders(userID int64) ([]domain.Order, error) {
 		if err != nil {
 			logger.Log.Error("error closing rows", logger.Error(err))
 		}
-		_ = rows.Err()
 	}(rows)
 
 	var orders []domain.Order
@@ -121,6 +120,10 @@ func (p *Postgres) Orders(userID int64) ([]domain.Order, error) {
 			return nil, fmt.Errorf("error scanning order: %w", err)
 		}
 		orders = append(orders, order)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over orders: %w", err)
 	}
 
 	return orders, nil
