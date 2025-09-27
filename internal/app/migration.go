@@ -18,6 +18,7 @@ func RunMigrations(url string) {
 	}
 
 	url = strings.ReplaceAll(url, "postgres://", "pgx5://")
+	url = strings.ReplaceAll(url, "postgresql://", "pgx5://")
 
 	logger.Log.Info("starting migration")
 
