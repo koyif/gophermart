@@ -110,7 +110,9 @@ func (p *Postgres) Orders(userID int64) ([]domain.Order, error) {
 		if err != nil {
 			logger.Log.Error("error closing rows", logger.Error(err))
 		}
+		_ = rows.Err()
 	}(rows)
+
 	var orders []domain.Order
 	for rows.Next() {
 		var order domain.Order

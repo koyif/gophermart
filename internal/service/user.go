@@ -35,12 +35,12 @@ func (s *UserService) Register(login, password string) (string, error) {
 		return "", fmt.Errorf("error while hashing password: %w", err)
 	}
 
-	userId, err := s.repo.CreateUser(login, string(hashedPassword))
+	userID, err := s.repo.CreateUser(login, string(hashedPassword))
 	if err != nil {
 		return "", err
 	}
 
-	return generateJWTToken(userId, s.config.PrivateKey)
+	return generateJWTToken(userID, s.config.PrivateKey)
 }
 
 func (s *UserService) Login(login, password string) (string, error) {
@@ -61,9 +61,9 @@ func (s *UserService) Login(login, password string) (string, error) {
 	return generateJWTToken(user.ID, s.config.PrivateKey)
 }
 
-func generateJWTToken(userId int64, privateKey string) (string, error) {
+func generateJWTToken(userID int64, privateKey string) (string, error) {
 	claims := jwt.MapClaims{
-		"sub": strconv.FormatInt(userId, 10),
+		"sub": strconv.FormatInt(userID, 10),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
