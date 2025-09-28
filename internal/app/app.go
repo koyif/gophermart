@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/koyif/gophermart/internal/postgres"
+	"github.com/koyif/gophermart/internal/service"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/koyif/gophermart/internal/config"
@@ -26,6 +28,15 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
+func (app App) Run(ctx context.Context) {
+	repository := postgres.New(app.DB)
+	processor := service.NewOrderProcessor(repository, repository)
+
+	ordersCh := processor.ExtractOrders(ctx)
+	processedCh := service.AccrualWorker(ctx, app.Config.AccrualSystemAddress, ordersCh)
+	processor.UpdateOrders(ctx, processedCh)
+}
+
 func initDB(url string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", url)
 	if err != nil {
@@ -41,9 +52,4 @@ func initDB(url string) (*sql.DB, error) {
 	}
 
 	return db, nil
-}
-
-func (app App) Run(ctx context.Context) error {
-
-	return nil
 }

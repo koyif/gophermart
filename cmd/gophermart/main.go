@@ -34,10 +34,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	if err := a.Run(ctx); err != nil {
-		logger.Log.Fatal("error running server", logger.Error(err))
-	}
-
+	a.Run(ctx)
 	go startServer(a)
 
 	<-ctx.Done()

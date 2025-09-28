@@ -50,15 +50,15 @@ func (h OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderID, err := strconv.ParseInt(string(body), 10, 64)
+	orderNumber, err := strconv.ParseInt(string(body), 10, 64)
 	if err != nil {
 		logger.Log.Warn("invalid order ID", logger.Error(err))
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	if ok := luhn.Valid(int(orderID)); !ok {
-		logger.Log.Warn("invalid order ID, Luhn check failed", logger.Int64("order_id", orderID))
+	if ok := luhn.Valid(int(orderNumber)); !ok {
+		logger.Log.Warn("invalid order ID, Luhn check failed", logger.Int64("orderNumber", orderNumber))
 		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
 		return
 	}
@@ -71,19 +71,19 @@ func (h OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.srv.Create(strconv.FormatInt(orderID, 10), userID)
+	err = h.srv.Create(strconv.FormatInt(orderNumber, 10), userID)
 	if err != nil {
 		if errors.Is(err, domain.ErrOrderExists) {
-			logger.Log.Warn("order already exists", logger.Int64("order_id", orderID))
+			logger.Log.Warn("order already exists", logger.Int64("order_id", orderNumber))
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 		if errors.Is(err, domain.ErrOrderAddedByAnotherUser) {
-			logger.Log.Warn("order belongs to another user", logger.Int64("order_id", orderID))
+			logger.Log.Warn("order belongs to another user", logger.Int64("order_id", orderNumber))
 			http.Error(w, "order belongs to another user", http.StatusConflict)
 			return
 		}
-		logger.Log.Error("error while creating order", logger.Int64("order_id", orderID), logger.Error(err))
+		logger.Log.Error("error while creating order", logger.Int64("order_id", orderNumber), logger.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -115,7 +115,7 @@ func (h OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	dtos := make([]dto.Order, len(orders))
 	for i, order := range orders {
 		dtos[i] = dto.Order{
-			Number:     order.OrderID,
+			Number:     order.Number,
 			Status:     order.Status,
 			Accrual:    order.Accrual,
 			UploadedAt: order.UploadedAt.Format(time.RFC3339),

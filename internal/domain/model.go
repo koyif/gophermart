@@ -11,7 +11,7 @@ type User struct {
 
 type Order struct {
 	ID         int64
-	OrderID    string
+	Number     string
 	UserID     int64
 	Status     string
 	Accrual    *int64

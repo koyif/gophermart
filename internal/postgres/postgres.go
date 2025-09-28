@@ -56,15 +56,15 @@ func (p *Postgres) User(login string) (*domain.User, error) {
 	return &user, nil
 }
 
-func (p *Postgres) CreateOrder(orderID string, userID int64) error {
+func (p *Postgres) CreateOrder(orderNumber string, userID int64) error {
 	tx, err := p.DB.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
 
 	var order domain.Order
-	err = tx.QueryRow("SELECT order_id, user_id FROM orders WHERE order_id = $1", orderID).
-		Scan(&order.OrderID, &order.UserID)
+	err = tx.QueryRow("SELECT number, user_id FROM orders WHERE number = $1", orderNumber).
+		Scan(&order.Number, &order.UserID)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		rollback(tx)
@@ -74,19 +74,19 @@ func (p *Postgres) CreateOrder(orderID string, userID int64) error {
 	if order.UserID != 0 && order.UserID != userID {
 		logger.Log.Warn(
 			"order already exists for different user",
-			logger.String("order_id", orderID),
+			logger.String("number", orderNumber),
 			logger.Int64("existing_user_id", order.UserID),
 			logger.Int64("new_user_id", userID),
 		)
 		rollback(tx)
 		return domain.ErrOrderAddedByAnotherUser
 	} else if order.UserID != 0 && order.UserID == userID {
-		logger.Log.Warn("order already exists", logger.String("order_id", orderID))
+		logger.Log.Warn("order already exists", logger.String("number", orderNumber))
 		rollback(tx)
 		return domain.ErrOrderExists
 	}
 
-	_, err = p.DB.Exec("INSERT INTO orders (order_id, user_id) VALUES ($1, $2)", orderID, userID)
+	_, err = p.DB.Exec("INSERT INTO orders (number, user_id) VALUES ($1, $2)", orderNumber, userID)
 	if err != nil {
 		rollback(tx)
 		return fmt.Errorf("error creating order: %w", err)
@@ -101,7 +101,7 @@ func (p *Postgres) CreateOrder(orderID string, userID int64) error {
 }
 
 func (p *Postgres) Orders(userID int64) ([]domain.Order, error) {
-	rows, err := p.DB.Query("SELECT order_id, user_id, status, accrual, uploaded_at FROM orders WHERE user_id = $1", userID)
+	rows, err := p.DB.Query("SELECT number, user_id, status, accrual, uploaded_at FROM orders WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching orders: %w", err)
 	}
@@ -115,7 +115,7 @@ func (p *Postgres) Orders(userID int64) ([]domain.Order, error) {
 	var orders []domain.Order
 	for rows.Next() {
 		var order domain.Order
-		err := rows.Scan(&order.OrderID, &order.UserID, &order.Status, &order.Accrual, &order.UploadedAt)
+		err := rows.Scan(&order.Number, &order.UserID, &order.Status, &order.Accrual, &order.UploadedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning order: %w", err)
 		}
@@ -127,6 +127,56 @@ func (p *Postgres) Orders(userID int64) ([]domain.Order, error) {
 	}
 
 	return orders, nil
+}
+
+func (p *Postgres) FetchPendingOrders() ([]domain.Order, error) {
+	rows, err := p.DB.Query("SELECT id, number, user_id, status FROM orders WHERE status = 'NEW' OR status = 'PROCESSING'")
+	if err != nil {
+		return nil, fmt.Errorf("error fetching orders: %w", err)
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			logger.Log.Error("error closing rows", logger.Error(err))
+		}
+	}(rows)
+
+	var orders []domain.Order
+	for rows.Next() {
+		var order domain.Order
+		err := rows.Scan(&order.ID, &order.Number, &order.UserID, &order.Status)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning order: %w", err)
+		}
+		orders = append(orders, order)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over orders: %w", err)
+	}
+
+	return orders, nil
+}
+
+func (p *Postgres) UpdateOrderStatus(orderID int64, status string, accrual *int64) error {
+	_, err := p.DB.Exec("UPDATE orders SET status = $1, accrual = $2 WHERE id = $3", status, accrual, orderID)
+	if err != nil {
+		return fmt.Errorf("error updating order status: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Postgres) UpdateUserBalance(userID int64, amount *int64) error {
+	if amount == nil {
+		return nil
+	}
+	_, err := p.DB.Exec("UPDATE users SET balance = balance + $1 WHERE id = $2", *amount, userID)
+	if err != nil {
+		return fmt.Errorf("error updating user balance: %w", err)
+	}
+
+	return nil
 }
 
 func rollback(tx *sql.Tx) {

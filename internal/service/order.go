@@ -3,7 +3,7 @@ package service
 import "github.com/koyif/gophermart/internal/domain"
 
 type OrderRepository interface {
-	CreateOrder(orderID string, userID int64) error
+	CreateOrder(orderNumber string, userID int64) error
 	Orders(userID int64) ([]domain.Order, error)
 }
 
@@ -17,8 +17,8 @@ func NewOrderService(repo OrderRepository) *OrderService {
 	}
 }
 
-func (s *OrderService) Create(orderID string, userID int64) error {
-	return s.repo.CreateOrder(orderID, userID)
+func (s *OrderService) Create(orderNumber string, userID int64) error {
+	return s.repo.CreateOrder(orderNumber, userID)
 }
 
 func (s *OrderService) Orders(userID int64) ([]domain.Order, error) {
