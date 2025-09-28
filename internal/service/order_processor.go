@@ -10,11 +10,11 @@ import (
 
 type orderProcessorRepository interface {
 	FetchPendingOrders() ([]domain.Order, error)
-	UpdateOrderStatus(orderID int64, status string, accrual *int64) error
+	UpdateOrderStatus(orderID int64, status string, accrual *float64) error
 }
 
 type userRepository interface {
-	UpdateUserBalance(userID int64, amount *int64) error
+	UpdateUserBalance(userID int64, amount *float64) error
 }
 
 type OrderProcessor struct {

@@ -14,6 +14,6 @@ type Order struct {
 	Number     string
 	UserID     int64
 	Status     string
-	Accrual    *int64
+	Accrual    *float64
 	UploadedAt time.Time
 }

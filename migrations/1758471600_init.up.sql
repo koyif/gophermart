@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS users
     id            INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     login         TEXT      NOT NULL UNIQUE,
     password      TEXT      NOT NULL,
-    balance       INTEGER   NOT NULL DEFAULT 0,
+    balance       FLOAT     NOT NULL DEFAULT 0.0,
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS orders
     number      TEXT      NOT NULL UNIQUE,
     user_id     INTEGER   NOT NULL REFERENCES users (id),
     status      TEXT      NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW', 'INVALID', 'PROCESSING', 'PROCESSED')),
-    accrual     INTEGER,
+    accrual     FLOAT,
     uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -22,6 +22,6 @@ CREATE TABLE IF NOT EXISTS withdrawals
     id           INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     order_id     INTEGER   NOT NULL REFERENCES orders (id),
     user_id      INTEGER   NOT NULL REFERENCES users (id),
-    amount       INTEGER   NOT NULL,
+    amount       FLOAT     NOT NULL,
     processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

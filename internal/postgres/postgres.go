@@ -158,7 +158,7 @@ func (p *Postgres) FetchPendingOrders() ([]domain.Order, error) {
 	return orders, nil
 }
 
-func (p *Postgres) UpdateOrderStatus(orderID int64, status string, accrual *int64) error {
+func (p *Postgres) UpdateOrderStatus(orderID int64, status string, accrual *float64) error {
 	_, err := p.DB.Exec("UPDATE orders SET status = $1, accrual = $2 WHERE id = $3", status, accrual, orderID)
 	if err != nil {
 		return fmt.Errorf("error updating order status: %w", err)
@@ -167,7 +167,7 @@ func (p *Postgres) UpdateOrderStatus(orderID int64, status string, accrual *int6
 	return nil
 }
 
-func (p *Postgres) UpdateUserBalance(userID int64, amount *int64) error {
+func (p *Postgres) UpdateUserBalance(userID int64, amount *float64) error {
 	if amount == nil {
 		return nil
 	}
