@@ -55,6 +55,9 @@ func sendRequest(accURL, number string) (*dto.AccrualResponse, error) {
 
 	response, err := http.Get(baseURL.String())
 	if err != nil {
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
 		return nil, err
 	}
 	defer func(body io.ReadCloser) {
