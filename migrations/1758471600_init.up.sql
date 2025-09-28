@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS orders
 CREATE TABLE IF NOT EXISTS withdrawals
 (
     id           INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    order_id     INTEGER   NOT NULL REFERENCES orders (id),
+    order_number TEXT      NOT NULL UNIQUE,
     user_id      INTEGER   NOT NULL REFERENCES users (id),
     amount       FLOAT     NOT NULL,
     processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

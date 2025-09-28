@@ -2,12 +2,14 @@ package balancehandler
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/koyif/gophermart/internal/domain"
 	"github.com/koyif/gophermart/pkg/dto"
 	"github.com/koyif/gophermart/pkg/logger"
 	"github.com/theplant/luhn"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type balanceService interface {
@@ -86,6 +88,20 @@ func (h BalanceHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 	err = h.balanceService.Withdraw(withdrawalRequest.Order, withdrawalRequest.Sum, userID)
 	if err != nil {
+		if errors.Is(err, domain.ErrInsufficientFunds) {
+			logger.Log.Warn("insufficient funds", logger.Int64("user_id", userID))
+			http.Error(w, "insufficient funds", http.StatusPaymentRequired)
+			return
+		} else if errors.Is(err, domain.ErrWithdrawalExists) {
+			logger.Log.Warn("withdrawal already exists", logger.Int64("user_id", userID))
+			http.Error(w, "withdrawal already exists", http.StatusOK)
+			return
+		} else if errors.Is(err, domain.ErrWithdrawalAddedByAnotherUser) {
+			logger.Log.Warn("withdrawal belongs to another user", logger.Int64("user_id", userID))
+			http.Error(w, "withdrawal belongs to another user", http.StatusConflict)
+			return
+		}
+
 		logger.Log.Error("error while withdrawing money", logger.Int64("user_id", userID), logger.Error(err))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -112,8 +128,9 @@ func (h BalanceHandler) Withdrawals(w http.ResponseWriter, r *http.Request) {
 	dtos := make([]dto.Withdrawal, len(withdrawals))
 	for i, withdrawal := range withdrawals {
 		dtos[i] = dto.Withdrawal{
-			Order: withdrawal.Order,
-			Sum:   withdrawal.Sum,
+			Order:       withdrawal.OrderNumber,
+			Sum:         withdrawal.Amount,
+			ProcessedAt: withdrawal.ProcessedAt.Format(time.RFC3339),
 		}
 	}
 
