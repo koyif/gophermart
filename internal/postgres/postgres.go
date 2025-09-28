@@ -179,6 +179,82 @@ func (p *Postgres) UpdateUserBalance(userID int64, amount *float64) error {
 	return nil
 }
 
+func (p *Postgres) Balance(userID int64) (*domain.Balance, error) {
+	var balance domain.Balance
+	err := p.DB.QueryRow("SELECT balance, withdrawn FROM users WHERE id = $1", userID).
+		Scan(&balance.Current, &balance.Withdrawn)
+
+	if err != nil {
+		logger.Log.Warn("error fetching balance", logger.Int64("user_id", userID), logger.Error(err))
+		return nil, fmt.Errorf("error fetching balance: %w", err)
+	}
+
+	return &balance, nil
+}
+
+func (p *Postgres) Withdrawals(userID int64) ([]domain.Withdrawal, error) {
+	rows, err := p.DB.Query("SELECT order_id, sum, processed_at FROM withdrawals WHERE user_id = $1", userID)
+	if err != nil {
+		logger.Log.Warn("error fetching withdrawals", logger.Int64("user_id", userID), logger.Error(err))
+		return nil, fmt.Errorf("error fetching withdrawals: %w", err)
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			logger.Log.Error("error closing rows", logger.Error(err))
+		}
+	}(rows)
+
+	var withdrawals []domain.Withdrawal
+	for rows.Next() {
+		var withdrawal domain.Withdrawal
+		err := rows.Scan(&withdrawal.Order, &withdrawal.Sum, &withdrawal.ProcessedAt)
+		if err != nil {
+			logger.Log.Warn("error scanning withdrawal", logger.Int64("user_id", userID), logger.Error(err))
+			return nil, fmt.Errorf("error scanning withdrawal: %w", err)
+		}
+		withdrawals = append(withdrawals, withdrawal)
+	}
+
+	if err = rows.Err(); err != nil {
+		logger.Log.Warn("error iterating over withdrawals", logger.Int64("user_id", userID), logger.Error(err))
+		return nil, fmt.Errorf("error iterating over withdrawals: %w", err)
+	}
+
+	return withdrawals, nil
+}
+
+func (p *Postgres) Withdraw(orderID string, amount float64, userID int64) error {
+	tx, err := p.DB.BeginTx(context.Background(), nil)
+	if err != nil {
+		logger.Log.Error("error starting transaction", logger.Error(err))
+		return fmt.Errorf("error starting transaction: %w", err)
+	}
+
+	_, err = tx.Exec("INSERT INTO withdrawals (order_id, sum, user_id) VALUES ($1, $2, $3)", orderID, amount, userID)
+	if err != nil {
+		rollback(tx)
+		logger.Log.Error("error inserting withdrawal", logger.String("order_id", orderID), logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
+		return fmt.Errorf("error inserting withdrawal: %w", err)
+	}
+
+	_, err = tx.Exec("UPDATE users SET balance = balance - $1, withdrawn = withdrawn + $1 WHERE id = $2 AND balance >= $1", amount, userID)
+	if err != nil {
+		rollback(tx)
+		logger.Log.Error("error updating user balance for withdrawal", logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
+		return fmt.Errorf("error updating user balance for withdrawal: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		rollback(tx)
+		logger.Log.Error("error committing transaction for withdrawal", logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
+		return fmt.Errorf("error committing transaction for withdrawal: %w", err)
+	}
+
+	return nil
+}
+
 func rollback(tx *sql.Tx) {
 	err := tx.Rollback()
 	if err != nil {

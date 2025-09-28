@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/koyif/gophermart/internal/handler/balance"
 	"github.com/koyif/gophermart/internal/handler/middleware"
 	"github.com/koyif/gophermart/internal/handler/order"
 	"github.com/koyif/gophermart/internal/handler/user"
@@ -19,6 +20,9 @@ func (app App) Router() *chi.Mux {
 	userService := service.NewUserService(p, app.Config)
 	userHandler := userhandler.New(userService)
 
+	balanceService := service.NewBalanceService(p, p)
+	balanceHandler := balancehandler.New(balanceService)
+
 	orderService := service.NewOrderService(p)
 	orderHandler := orderhandler.New(orderService)
 
@@ -27,10 +31,10 @@ func (app App) Router() *chi.Mux {
 		r.Post("/login", userHandler.Login)
 
 		r.Post("/orders", orderHandler.CreateOrder)
-		r.Get("/orders", orderHandler.ListOrders)
-		//r.Get("balance", balanceHandler.GetBalance)
-		//r.Post("balance/withdraw", balanceHandler.Withdraw)
-		//r.Get("withdrawals", balanceHandler.ListWithdrawals)
+		r.Get("/orders", orderHandler.Orders)
+		r.Get("/balance", balanceHandler.Balance)
+		r.Post("/balance/withdraw", balanceHandler.Withdraw)
+		r.Get("/withdrawals", balanceHandler.Withdrawals)
 	})
 
 	return r

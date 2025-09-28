@@ -17,3 +17,22 @@ type Order struct {
 	Accrual    *float64
 	UploadedAt time.Time
 }
+
+/**
+  {
+	  "order": "2377225624",
+	  "sum": 500,
+	  "processed_at": "2020-12-09T16:09:57+03:00"
+  }
+*/
+
+type Withdrawal struct {
+	Order       string
+	Sum         float64
+	ProcessedAt time.Time
+}
+
+type Balance struct {
+	Current   float64
+	Withdrawn float64
+}

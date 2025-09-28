@@ -25,14 +25,10 @@ func String(key, value string) zap.Field {
 	return zap.String(key, value)
 }
 
-func Int(key string, value int) zap.Field {
-	return zap.Int(key, value)
-}
-
-func Float(key string, value float64) zap.Field {
-	return zap.Float64(key, value)
-}
-
 func Int64(key string, value int64) zap.Field {
 	return zap.Int64(key, value)
+}
+
+func Float64(key string, value float64) zap.Field {
+	return zap.Float64(key, value)
 }

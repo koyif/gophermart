@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users
     login         TEXT      NOT NULL UNIQUE,
     password      TEXT      NOT NULL,
     balance       FLOAT     NOT NULL DEFAULT 0.0,
+    withdrawn     FLOAT     NOT NULL DEFAULT 0.0,
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

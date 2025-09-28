@@ -91,7 +91,7 @@ func (h OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
+func (h OrderHandler) Orders(w http.ResponseWriter, r *http.Request) {
 	userIDHeader := r.Header.Get("User-ID")
 	userID, err := strconv.ParseInt(userIDHeader, 10, 64)
 	if err != nil {
