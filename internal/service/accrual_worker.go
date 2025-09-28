@@ -46,20 +46,19 @@ func worker(ctx context.Context, accURL string, jobs <-chan domain.Order, result
 }
 
 func sendRequest(accURL, number string) (*dto.AccrualResponse, error) {
-	baseUrl, err := url.Parse(accURL)
+	baseURL, err := url.Parse(accURL)
 	if err != nil {
 		return nil, err
 	}
 
-	baseUrl = baseUrl.JoinPath("api/orders", number)
+	baseURL = baseURL.JoinPath("api/orders", number)
 
-	response, err := http.Get(baseUrl.String())
+	response, err := http.Get(baseURL.String())
 	if err != nil {
 		return nil, err
 	}
-
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
+	defer func(body io.ReadCloser) {
+		err := body.Close()
 		if err != nil {
 			logger.Log.Error("error while closing response body", logger.Error(err))
 			return
