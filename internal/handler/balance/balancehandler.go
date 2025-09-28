@@ -49,6 +49,8 @@ func (h BalanceHandler) Balance(w http.ResponseWriter, r *http.Request) {
 		Withdrawn: balance.Withdrawn,
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		logger.Log.Error("error while encoding balance to JSON", logger.Int64("user_id", userID), logger.Error(err))
@@ -134,6 +136,7 @@ func (h BalanceHandler) Withdrawals(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(dtos)
 	if err != nil {
