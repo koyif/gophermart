@@ -20,14 +20,14 @@ type userRepository interface {
 type OrderProcessor struct {
 	orderRepo orderProcessorRepository
 	userRepo  userRepository
-	mu        sync.RWMutex
+	mu        *sync.RWMutex
 }
 
 func NewOrderProcessor(orderRepo orderProcessorRepository, userRepo userRepository) *OrderProcessor {
 	return &OrderProcessor{
 		orderRepo: orderRepo,
 		userRepo:  userRepo,
-		mu:        sync.RWMutex{},
+		mu:        &sync.RWMutex{},
 	}
 }
 

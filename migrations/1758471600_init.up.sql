@@ -1,28 +1,28 @@
 CREATE TABLE IF NOT EXISTS users
 (
     id            INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    login         TEXT      NOT NULL UNIQUE,
-    password      TEXT      NOT NULL,
-    balance       FLOAT     NOT NULL DEFAULT 0.0,
-    withdrawn     FLOAT     NOT NULL DEFAULT 0.0,
-    registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    login         VARCHAR(32) NOT NULL UNIQUE,
+    password      VARCHAR(60) NOT NULL,
+    balance       FLOAT       NOT NULL DEFAULT 0.0,
+    withdrawn     FLOAT       NOT NULL DEFAULT 0.0,
+    registered_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS orders
 (
     id          INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    number      TEXT      NOT NULL UNIQUE,
-    user_id     INTEGER   NOT NULL REFERENCES users (id),
-    status      TEXT      NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW', 'INVALID', 'PROCESSING', 'PROCESSED')),
+    number      VARCHAR(32) NOT NULL UNIQUE,
+    user_id     INTEGER     NOT NULL REFERENCES users (id),
+    status      VARCHAR(16) NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW', 'INVALID', 'PROCESSING', 'PROCESSED')),
     accrual     FLOAT,
-    uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    uploaded_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS withdrawals
 (
     id           INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    order_number TEXT      NOT NULL UNIQUE,
-    user_id      INTEGER   NOT NULL REFERENCES users (id),
-    amount       FLOAT     NOT NULL,
-    processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    order_number VARCHAR(32) NOT NULL UNIQUE,
+    user_id      INTEGER     NOT NULL REFERENCES users (id),
+    amount       FLOAT       NOT NULL,
+    processed_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
