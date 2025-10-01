@@ -3,6 +3,7 @@ package domain
 import "errors"
 
 var (
+	ErrUserNotFound                 = errors.New("user not found")
 	ErrUserExists                   = errors.New("user already exists")
 	ErrIncorrectCredentials         = errors.New("incorrect credentials")
 	ErrOrderExists                  = errors.New("order already exists")

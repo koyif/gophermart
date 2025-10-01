@@ -51,5 +51,7 @@ func initDB(url string) (*sql.DB, error) {
 		return nil, fmt.Errorf("error pinging database: %w", err)
 	}
 
+	RunMigrations(url)
+
 	return db, nil
 }

@@ -61,13 +61,13 @@ func (p *Postgres) CreateOrder(orderNumber string, userID int64) error {
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
+	defer rollback(tx)
 
 	var order domain.Order
 	err = tx.QueryRow("SELECT number, user_id FROM orders WHERE number = $1", orderNumber).
 		Scan(&order.Number, &order.UserID)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		rollback(tx)
 		return fmt.Errorf("error fetching order: %w", err)
 	}
 
@@ -78,22 +78,18 @@ func (p *Postgres) CreateOrder(orderNumber string, userID int64) error {
 			logger.Int64("existing_user_id", order.UserID),
 			logger.Int64("new_user_id", userID),
 		)
-		rollback(tx)
 		return domain.ErrOrderAddedByAnotherUser
 	} else if order.UserID != 0 && order.UserID == userID {
 		logger.Log.Warn("order already exists", logger.String("number", orderNumber))
-		rollback(tx)
 		return domain.ErrOrderExists
 	}
 
 	_, err = p.DB.Exec("INSERT INTO orders (number, user_id) VALUES ($1, $2)", orderNumber, userID)
 	if err != nil {
-		rollback(tx)
 		return fmt.Errorf("error creating order: %w", err)
 	}
 	err = tx.Commit()
 	if err != nil {
-		rollback(tx)
 		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
@@ -226,12 +222,13 @@ func (p *Postgres) Withdraw(orderNumber string, amount float64, userID int64) er
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
 
+	defer rollback(tx)
+
 	var withdrawal domain.Withdrawal
 	err = tx.QueryRow("SELECT user_id, order_number FROM withdrawals WHERE order_number = $1", orderNumber).
 		Scan(&withdrawal.UserID, &withdrawal.OrderNumber)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		rollback(tx)
 		return fmt.Errorf("error fetching withdrawal: %w", err)
 	}
 
@@ -242,43 +239,43 @@ func (p *Postgres) Withdraw(orderNumber string, amount float64, userID int64) er
 			logger.Int64("existing_user_id", withdrawal.UserID),
 			logger.Int64("new_user_id", userID),
 		)
-		rollback(tx)
 		return domain.ErrWithdrawalAddedByAnotherUser
 	} else if withdrawal.UserID != 0 && withdrawal.UserID == userID {
 		logger.Log.Warn("withdrawal already exists", logger.String("number", orderNumber))
-		rollback(tx)
 		return domain.ErrWithdrawalExists
 	}
 
 	_, err = tx.Exec("INSERT INTO withdrawals (order_number, amount, user_id) VALUES ($1, $2, $3)", orderNumber, amount, userID)
 	if err != nil {
-		rollback(tx)
 		logger.Log.Error("error inserting withdrawal", logger.String("order_id", orderNumber), logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
 		return fmt.Errorf("error inserting withdrawal: %w", err)
 	}
 
-	result, err := tx.Exec("UPDATE users SET balance = balance - $1, withdrawn = withdrawn + $1 WHERE id = $2 AND balance >= $1", amount, userID)
+	var currentBalance float64
+	err = tx.QueryRow("SELECT balance FROM users WHERE id = $1", userID).Scan(&currentBalance)
 	if err != nil {
-		rollback(tx)
-		logger.Log.Error("error updating user balance for withdrawal", logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
-		return fmt.Errorf("error updating user balance for withdrawal: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Warn("user not found for withdrawal", logger.Int64("user_id", userID))
+			return domain.ErrUserNotFound
+		}
+
+		logger.Log.Error("error fetching current balance", logger.Int64("user_id", userID), logger.Error(err))
+		return fmt.Errorf("error fetching current balance: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		rollback(tx)
-		logger.Log.Error("error checking rows affected for balance update", logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
-		return fmt.Errorf("error checking rows affected for balance update: %w", err)
-	}
-	if rowsAffected == 0 {
-		rollback(tx)
+	if currentBalance < amount {
 		logger.Log.Warn("insufficient funds for withdrawal", logger.Float64("amount", amount), logger.Int64("user_id", userID))
 		return domain.ErrInsufficientFunds
 	}
 
+	_, err = tx.Exec("UPDATE users SET balance = balance - $1, withdrawn = withdrawn + $1 WHERE id = $2", amount, userID)
+	if err != nil {
+		logger.Log.Error("error updating user balance for withdrawal", logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
+		return fmt.Errorf("error updating user balance for withdrawal: %w", err)
+	}
+
 	err = tx.Commit()
 	if err != nil {
-		rollback(tx)
 		logger.Log.Error("error committing transaction for withdrawal", logger.Float64("amount", amount), logger.Int64("user_id", userID), logger.Error(err))
 		return fmt.Errorf("error committing transaction for withdrawal: %w", err)
 	}
@@ -287,8 +284,9 @@ func (p *Postgres) Withdraw(orderNumber string, amount float64, userID int64) er
 }
 
 func rollback(tx *sql.Tx) {
-	err := tx.Rollback()
-	if err != nil {
-		logger.Log.Error(transactionRollbackError, logger.Error(err))
+	if err := tx.Rollback(); err != nil {
+		if !errors.Is(err, sql.ErrTxDone) {
+			logger.Log.Error(transactionRollbackError, logger.Error(err))
+		}
 	}
 }
