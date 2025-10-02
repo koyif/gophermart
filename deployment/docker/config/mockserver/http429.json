@@ -1,0 +1,18 @@
+[
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/orders/{orderId}",
+      "pathParameters": {
+        "orderId": ".*"
+      }
+    },
+    "httpResponse": {
+      "statusCode": 429,
+      "headers": {
+        "Retry-After": "5"
+      },
+      "body": "{\"error\":\"Too Many Requests\",\"message\":\"You have sent too many requests in a given amount of time.\"}"
+    }
+  }
+]
