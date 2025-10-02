@@ -9,9 +9,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"sync/atomic"
+	"time"
 )
 
 const workerCount = 5
+
+var sleepUntil atomic.Int64
 
 func AccrualWorker(ctx context.Context, accURL string, jobs <-chan domain.Order) <-chan domain.Order {
 	results := make(chan domain.Order, 1024)
@@ -22,20 +27,48 @@ func AccrualWorker(ctx context.Context, accURL string, jobs <-chan domain.Order)
 		}
 	}()
 
+	go func() {
+		select {
+		case <-ctx.Done():
+			close(results)
+		}
+	}()
+
 	return results
 }
 
 func worker(ctx context.Context, accURL string, jobs <-chan domain.Order, results chan<- domain.Order) {
 	for {
+		now := time.Now().UnixNano()
+		until := sleepUntil.Load()
+		if until > now {
+			sleepDur := time.Duration(until-now) * time.Nanosecond
+			timer := time.NewTimer(sleepDur)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+				logger.Log.Warn("resuming work after backoff")
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			return
 		case order := <-jobs:
-			accRes, err := sendRequest(accURL, order.Number)
+			accRes, retryAfter, err := sendRequest(accURL, order.Number)
 			if err != nil {
 				logger.Log.Error("error while sending request to accrual system", logger.Error(err))
 				continue
 			}
+
+			if retryAfter > 0 {
+				logger.Log.Warn("accrual system rate limit exceeded, backing off", logger.Int64("seconds", int64(retryAfter)))
+				sleepUntil.Store(time.Now().Add(time.Duration(retryAfter) * time.Second).UnixNano())
+				continue
+			}
+
 			if accRes.Status != "" && accRes.Status != order.Status {
 				order.Status = accRes.Status
 				order.Accrual = accRes.Accrual
@@ -45,10 +78,10 @@ func worker(ctx context.Context, accURL string, jobs <-chan domain.Order, result
 	}
 }
 
-func sendRequest(accURL, number string) (*dto.AccrualResponse, error) {
+func sendRequest(accURL, number string) (*dto.AccrualResponse, int, error) {
 	baseURL, err := url.Parse(accURL)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	baseURL = baseURL.JoinPath("api/orders", number)
@@ -58,7 +91,7 @@ func sendRequest(accURL, number string) (*dto.AccrualResponse, error) {
 		if response != nil && response.Body != nil {
 			_ = response.Body.Close()
 		}
-		return nil, err
+		return nil, 0, err
 	}
 	defer func(body io.ReadCloser) {
 		err := body.Close()
@@ -68,11 +101,17 @@ func sendRequest(accURL, number string) (*dto.AccrualResponse, error) {
 		}
 	}(response.Body)
 
+	if response.StatusCode == http.StatusTooManyRequests {
+		retryAfterStr := response.Header.Get("Retry-After")
+		retryAfter, _ := strconv.Atoi(retryAfterStr)
+		return nil, retryAfter, nil
+	}
+
 	var accRes dto.AccrualResponse
 	err = json.NewDecoder(response.Body).Decode(&accRes)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return &accRes, nil
+	return &accRes, 0, nil
 }
