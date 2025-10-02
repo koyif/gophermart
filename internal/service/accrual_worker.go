@@ -28,10 +28,8 @@ func AccrualWorker(ctx context.Context, accURL string, jobs <-chan domain.Order)
 	}()
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			close(results)
-		}
+		<-ctx.Done()
+		close(results)
 	}()
 
 	return results
