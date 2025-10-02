@@ -18,14 +18,6 @@ type Order struct {
 	UploadedAt time.Time
 }
 
-/**
-  {
-	  "order": "2377225624",
-	  "sum": 500,
-	  "processed_at": "2020-12-09T16:09:57+03:00"
-  }
-*/
-
 type Withdrawal struct {
 	UserID      int64
 	OrderNumber string
